@@ -19,7 +19,7 @@ on:
     - 'projekt1/**'
 
 env:
-    PROJECT_FILE: "electronics/board1/pcb/"
+    PROJECT_FILE: "electronics/board1/pcb/test/test.kicad_pro"
 
 jobs:
   kiri-diff:
