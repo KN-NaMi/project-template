@@ -5,49 +5,61 @@ on:
     types: [opened, synchronize]
 
 jobs:
-  discover-projects:
-    runs-on: ubuntu-latest
-    outputs:
-      projects: ${{ steps.collect.outputs.projects }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Find KiCad projects
-        id: collect
-        run: |
-          FILES=$(find electronics -name "*.kicad_pro")
-          JSON=$(printf '%s\n' $FILES | jq -R -s 'split("\n") | map(select(length>0))' -c)
-          echo "projects=$JSON" >> $GITHUB_OUTPUT
-
   kiri-diff:
-    needs: discover-projects
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        project: ${{ fromJson(needs.discover-projects.outputs.projects) }}
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Run Kiri Diff (using leoheck/kiri)
+      - name: Install system dependencies
         run: |
-          PROJECT="${{ matrix.project }}"
-          PROJECT_DIR=$(dirname "$PROJECT")
+          sudo apt update
+          sudo apt install -y \
+            curl git jq opam m4 pkg-config libgtk-3-dev \
+            imagemagick xdg-utils libgl1-mesa-dev \
+            xvfb xauth x11-apps
 
-          echo "Running Kiri for: $PROJECT"
-         
-          docker run --rm \
-            -v "$PWD":/project \
-            leoheck/kiri:latest \
-            kiri -h
+      - name: Initialize OPAM
+        run: |
+          opam init -y --disable-sandboxing
+          eval $(opam env)
 
+      - name: Install KiRI dependencies
+        run: |
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/leoheck/kiri/main/install_dependencies.sh)"
 
-      # - name: Upload Kiri output
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: kiri-output-${{ matrix.project }}
-      #     path: ${{ matrix.project }}/../.kiri
-      #     if-no-files-found: warn
+      - name: Install KiRI
+        run: |
+          bash -c "INSTALL_KIRI_REMOTELLY=1; \
+            $(curl -fsSL https://raw.githubusercontent.com/leoheck/kiri/main/install_kiri.sh)"
+
+      - name: Set KiRI environment
+        run: |
+          eval $(opam env)
+          echo "KIRI_HOME=$HOME/.local/share/kiri" >> $GITHUB_ENV
+          echo "$HOME/.local/share/kiri/submodules/KiCad-Diff/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/share/kiri/bin" >> $GITHUB_PATH
+
+      - name: Run KiRI for all projects
+        run: |
+          FILES=$(find electronics -name "*.kicad_pro")
+          echo "Found:"
+          echo "$FILES"
+
+          for PROJECT in $FILES; do
+            DIR=$(dirname "$PROJECT")
+            mkdir -p "$DIR/.kiri"
+
+            echo "Running KiRI on: $PROJECT"
+            kiri -p "$PROJECT"
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiri-output
+          path: electronics/**/.kiri
+          if-no-files-found: warn
