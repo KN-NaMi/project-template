@@ -5,7 +5,6 @@ on:
     types: [opened, synchronize]
 
 jobs:
-
   discover-projects:
     runs-on: ubuntu-latest
     outputs:
@@ -33,21 +32,22 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Run kiri-docker diff
+      - name: Run Kiri Diff (using leoheck/kiri)
         run: |
-          PROJECT=${{ matrix.project }}
+          PROJECT="${{ matrix.project }}"
           PROJECT_DIR=$(dirname "$PROJECT")
 
-          echo "Running kiri-docker for: $PROJECT"
+          echo "Running Kiri for: $PROJECT"
 
           docker run --rm \
             -v "$PWD":/project \
-            ghcr.io/${{ github.repository }}/kiri-docker:latest \
-            kiri-docker /project -k "-p $PROJECT"
+            leoheck/kiri:latest \
+            /kiri-docker/kiri-docker /project -k "-p $PROJECT"
 
+          # Ensure output folder exists
           mkdir -p "$PROJECT_DIR/.kiri"
 
-      - name: Upload artifact
+      - name: Upload Kiri output
         uses: actions/upload-artifact@v4
         with:
           name: kiri-output-${{ matrix.project }}
