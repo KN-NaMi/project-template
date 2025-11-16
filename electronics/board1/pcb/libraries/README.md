@@ -1,5 +1,4 @@
 # Libraries
-# Libraries
 
 This directory contains custom component libraries used in PCB designs for the project. Each library includes schematic symbols and PCB footprints.
 
