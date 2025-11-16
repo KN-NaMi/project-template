@@ -5,63 +5,61 @@ on:
     types: [opened, synchronize]
 
 jobs:
-
-  discover-projects:
+  kiri-diff:
     runs-on: ubuntu-latest
-    outputs:
-      projects: ${{ steps.collect.outputs.projects }}
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Find all KiCad .kicad_pro files
-        id: collect
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            curl git jq opam m4 pkg-config libgtk-3-dev \
+            imagemagick xdg-utils libgl1-mesa-dev \
+            xvfb xauth x11-apps
+
+      - name: Initialize OPAM
+        run: |
+          opam init -y --disable-sandboxing
+          eval $(opam env)
+
+      - name: Install KiRI dependencies
+        run: |
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/leoheck/kiri/main/install_dependencies.sh)"
+
+      - name: Install KiRI
+        run: |
+          bash -c "INSTALL_KIRI_REMOTELLY=1; \
+            $(curl -fsSL https://raw.githubusercontent.com/leoheck/kiri/main/install_kiri.sh)"
+
+      - name: Set KiRI environment
+        run: |
+          eval $(opam env)
+          echo "KIRI_HOME=$HOME/.local/share/kiri" >> $GITHUB_ENV
+          echo "$HOME/.local/share/kiri/submodules/KiCad-Diff/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/share/kiri/bin" >> $GITHUB_PATH
+
+      - name: Run KiRI for all projects
         run: |
           FILES=$(find electronics -name "*.kicad_pro")
           echo "Found:"
           echo "$FILES"
 
-          # Convert to JSON array for matrix
-          JSON=$(printf '%s\n' $FILES | jq -R -s 'split("\n") | map(select(length > 0))' -c)
-          echo "projects=$JSON" >> "$GITHUB_OUTPUT"
+          for PROJECT in $FILES; do
+            DIR=$(dirname "$PROJECT")
+            mkdir -p "$DIR/.kiri"
 
+            echo "Running KiRI on: $PROJECT"
+            kiri -p "$PROJECT"
+          done
 
-  kiri-diff:
-    needs: discover-projects
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        project: ${{ fromJson(needs.discover-projects.outputs.projects) }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Print project path
-        run: echo "Processing: ${{ matrix.project }}"
-
-      - name: Run Kiri-Docker
-        run: |
-          PROJECT="${{ matrix.project }}"
-          PROJECT_DIR=$(dirname "$PROJECT")
-
-          echo "Running kiri-docker for $PROJECT"
-
-          docker run --rm \
-            -v "$PWD":/project \
-            leoheck/kiri:latest \
-            kiri-docker /project -k "-p /project/$PROJECT"
-
-          # kiri-docker always outputs to .kiri inside project directory
-          if [ ! -d "$PROJECT_DIR/.kiri" ]; then
-            echo "⚠️ No .kiri directory found. Creating empty one."
-            mkdir -p "$PROJECT_DIR/.kiri"
-          fi
-
-      - name: Upload Kiri output
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: kiri-output-${{ matrix.project }}
-          path: ${{ matrix.project }}/../.kiri
+          name: kiri-output
+          path: electronics/**/.kiri
           if-no-files-found: warn
