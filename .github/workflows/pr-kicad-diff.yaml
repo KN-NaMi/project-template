@@ -30,19 +30,18 @@ jobs:
       matrix:
         project: ${{ fromJson(needs.discover-projects.outputs.projects) }}
 
-    steps: 
+    steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Print project path
-        run: echo "Processing: ${{ matrix.project }}"
+        run: echo "Processing ${{ matrix.project }}"
 
       - name: Run Kiri-Docker
         run: |
           PROJECT="${{ matrix.project }}"
           PROJECT_DIR=$(dirname "$PROJECT")
-
           echo "Running kiri-docker for $PROJECT"
 
           docker run --rm \
