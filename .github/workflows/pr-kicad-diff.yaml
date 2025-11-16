@@ -13,17 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Find all KiCad .kicad_pro files
+      - name: Find KiCad projects
         id: collect
         run: |
           FILES=$(find electronics -name "*.kicad_pro")
-          echo "Found:"
-          echo "$FILES"
-
-          # Convert to JSON array
-          JSON=$(printf '%s\n' $FILES | jq -R -s 'split("\n") | map(select(length > 0))' -c)
-          echo "projects=$JSON" >> "$GITHUB_OUTPUT"
-
+          JSON=$(printf '%s\n' $FILES | jq -R -s 'split("\n") | map(select(length>0))' -c)
+          echo "projects=$JSON" >> $GITHUB_OUTPUT
 
   kiri-diff:
     needs: discover-projects
@@ -38,28 +33,21 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Print project path
-        run: echo "Processing ${{ matrix.project }}"
-
-      - name: Run Kiri inside Docker
+      - name: Run kiri-docker diff
         run: |
-          PROJECT="${{ matrix.project }}"
+          PROJECT=${{ matrix.project }}
           PROJECT_DIR=$(dirname "$PROJECT")
 
           echo "Running kiri-docker for: $PROJECT"
 
           docker run --rm \
             -v "$PWD":/project \
-            leoheck/kiri:latest \
-            kiri-docker /project -k "-p /project/${PROJECT}"
+            ghcr.io/${{ github.repository }}/kiri-docker:latest \
+            kiri-docker /project -k "-p $PROJECT"
 
-          if [ ! -d "$PROJECT_DIR/.kiri" ]; then
-            echo "⚠️ No .kiri directory found. Creating an empty one."
-            mkdir -p "$PROJECT_DIR/.kiri"
-          fi
+          mkdir -p "$PROJECT_DIR/.kiri"
 
-
-      - name: Upload Kiri output
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: kiri-output-${{ matrix.project }}
