@@ -8,9 +8,9 @@ Multi-disciplinary project template for electronics, mechanics, and software dev
 project-template/
 ├── README.md                 # Project overview
 ├── bom.csv                   # Bill of Materials
-├── electronics/             # Electronics
-├── mechanics/               # Mechanical
-└── software/                # Software
+├── electronics/              # Electronics
+├── mechanics/                # Mechanical
+└── software/                 # Software
 ```
 
 ## 🚀 Quick Start
