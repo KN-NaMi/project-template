@@ -1,43 +1,63 @@
 name: KiCad PR Diff
 
-permissions:
-  contents: write
-  actions: write
-  packages: write
-  pull-requests: write
-
-  
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 on:
   pull_request:
-    types:
-    - opened
-    - synchronize
-
-env:
-    PROJECT_FILE: ./electronics/board1/pcb/test/test.kicad_pro
+    types: [opened, synchronize]
 
 jobs:
-  kiri-diff:
+  discover-projects:
     runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.collect.outputs.projects }}
     steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-    - name: Kiri
-      uses: hacker-fab/kiri-github-action@v1.2
-      with:
-        project-file: ./electronics/board1/pcb/test/test.kicad_pro
-        kiri-debug: true
+      - uses: actions/checkout@v4
 
-    - name: Run upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: kiri-output
-        path: ./electronics/board1/pcb/test/
-        if-no-files-found: warn
-      env:
-        PROJECT_FILE: ./projekt1/new.kicad_pro
+      - name: Find all KiCad .kicad_pro files
+        id: collect
+        run: |
+          FILES=$(find electronics -name "*.kicad_pro")
+          echo "Found:"
+          echo "$FILES"
+
+          JSON=$(printf '%s\n' $FILES | jq -R -s 'split("\n") | map(select(length > 0))' -c)
+          echo "projects=$JSON" >> "$GITHUB_OUTPUT"
+
+  kiri-diff:
+    needs: discover-projects
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        project: ${{ fromJson(needs.discover-projects.outputs.projects) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Print project being processed
+        run: echo "Processing ${{ matrix.project }}"
+
+      - name: Run Kiri (raw docker)
+        run: |
+          PROJECT="${{ matrix.project }}"
+          PROJECT_DIR=$(dirname "$PROJECT")
+
+          echo "Running Kiri for: $PROJECT"
+
+          docker run \
+            -v "$PWD":/github/workspace \
+            ghcr.io/usa-reddragon/kiri:v1.0.30 \
+            kiri --no-server --all "/github/workspace/$PROJECT"
+
+          if [ ! -d "$PROJECT_DIR/.kiri" ]; then
+            echo "⚠️ No .kiri directory found – creating empty one."
+            mkdir -p "$PROJECT_DIR/.kiri"
+          fi
+
+      - name: Upload Kiri output
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiri-output-${{ matrix.project }}
+          path: ${{ matrix.project }}/../.kiri
+          if-no-files-found: warn
