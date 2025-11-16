@@ -19,11 +19,8 @@ jobs:
           FILES=$(find electronics -name "*.kicad_pro")
           echo "Found:"
           echo "$FILES"
-
-          # Convert to JSON array for matrix
           JSON=$(printf '%s\n' $FILES | jq -R -s 'split("\n") | map(select(length > 0))' -c)
           echo "projects=$JSON" >> "$GITHUB_OUTPUT"
-
 
   kiri-diff:
     needs: discover-projects
@@ -33,7 +30,7 @@ jobs:
       matrix:
         project: ${{ fromJson(needs.discover-projects.outputs.projects) }}
 
-    steps:
+    steps: 
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -53,7 +50,6 @@ jobs:
             leoheck/kiri:latest \
             kiri-docker /project -k "-p /project/$PROJECT"
 
-          # kiri-docker always outputs to .kiri inside project directory
           if [ ! -d "$PROJECT_DIR/.kiri" ]; then
             echo "⚠️ No .kiri directory found. Creating empty one."
             mkdir -p "$PROJECT_DIR/.kiri"
