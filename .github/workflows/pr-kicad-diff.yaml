@@ -46,19 +46,18 @@ jobs:
           PROJECT="${{ matrix.project }}"
           PROJECT_DIR=$(dirname "$PROJECT")
 
-          echo "Running kiri inside container for: $PROJECT"
+          echo "Running kiri-docker for: $PROJECT"
 
           docker run --rm \
             -v "$PWD":/project \
-            -w /project \
             leoheck/kiri:latest \
-            bash -lc "kiri -p /project/${PROJECT}"
+            kiri-docker /project -k "-p /project/${PROJECT}"
 
-          # Ensure .kiri exists (Kiri may skip if no PCB diffs)
           if [ ! -d "$PROJECT_DIR/.kiri" ]; then
-            echo "⚠️ No .kiri directory found. Creating empty one."
+            echo "⚠️ No .kiri directory found. Creating an empty one."
             mkdir -p "$PROJECT_DIR/.kiri"
           fi
+
 
       - name: Upload Kiri output
         uses: actions/upload-artifact@v4
