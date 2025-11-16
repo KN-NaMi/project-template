@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize]
 
 jobs:
+
   discover-projects:
     runs-on: ubuntu-latest
     outputs:
@@ -19,8 +20,10 @@ jobs:
           echo "Found:"
           echo "$FILES"
 
+          # Convert to JSON array for matrix
           JSON=$(printf '%s\n' $FILES | jq -R -s 'split("\n") | map(select(length > 0))' -c)
           echo "projects=$JSON" >> "$GITHUB_OUTPUT"
+
 
   kiri-diff:
     needs: discover-projects
@@ -35,27 +38,26 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Print project being processed
-        run: echo "Processing ${{ matrix.project }}"
+      - name: Print project path
+        run: echo "Processing: ${{ matrix.project }}"
 
-      - name: Run Kiri (raw docker, entrypoint override)
+      - name: Run Kiri-Docker
         run: |
           PROJECT="${{ matrix.project }}"
           PROJECT_DIR=$(dirname "$PROJECT")
 
-          echo "Running Kiri for: $PROJECT"
+          echo "Running kiri-docker for $PROJECT"
 
-          docker run \
-            --entrypoint "" \
-            -v "$PWD":/github/workspace \
-            ghcr.io/usa-reddragon/kiri:v1.0.30 \
-            /usr/local/bin/kiri --no-server --all "/github/workspace/$PROJECT"
+          docker run --rm \
+            -v "$PWD":/project \
+            leoheck/kiri:latest \
+            kiri-docker /project -k "-p /project/$PROJECT"
 
+          # kiri-docker always outputs to .kiri inside project directory
           if [ ! -d "$PROJECT_DIR/.kiri" ]; then
-            echo "⚠️ No .kiri directory found – creating empty one."
+            echo "⚠️ No .kiri directory found. Creating empty one."
             mkdir -p "$PROJECT_DIR/.kiri"
           fi
-
 
       - name: Upload Kiri output
         uses: actions/upload-artifact@v4
