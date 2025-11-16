@@ -42,7 +42,7 @@ jobs:
           docker run --rm \
             -v "$PWD":/project \
             leoheck/kiri:latest \
-            kiri -p /project/${PROJECT}
+            kiri -h
 
 
       # - name: Upload Kiri output
