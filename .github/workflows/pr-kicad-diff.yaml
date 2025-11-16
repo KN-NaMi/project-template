@@ -42,7 +42,7 @@ jobs:
           docker run --rm \
             -v "$PWD":/project \
             leoheck/kiri:latest \
-            /kiri-docker/kiri-docker /project -k "-p $PROJECT"
+            kiri /project -k "-p $PROJECT"
 
           # Ensure output folder exists
           mkdir -p "$PROJECT_DIR/.kiri"
