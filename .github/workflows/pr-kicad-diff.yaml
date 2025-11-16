@@ -19,7 +19,6 @@ jobs:
           echo "Found:"
           echo "$FILES"
 
-          # Tworzymy kompaktowy JSON do matrix
           JSON=$(printf '%s\n' $FILES | jq -R -s 'split("\n") | map(select(length > 0))' -c)
           echo "projects=$JSON" >> "$GITHUB_OUTPUT"
 
@@ -38,7 +37,7 @@ jobs:
 
       - name: Print project being processed
         run: echo "Processing ${{ matrix.project }}"
-        
+
       - name: Run Kiri (raw docker mode)
         run: |
           PROJECT="${{ matrix.project }}"
@@ -48,11 +47,10 @@ jobs:
           echo "Project directory: $PROJECT_DIR"
 
           docker run \
-            -v "$PWD":/data \
+            -v "$PWD":/github/workspace \
             ghcr.io/usa-reddragon/kiri:v1.0.30 \
-            kiri --no-server --all "$PROJECT"
+            kiri --no-server --all "/github/workspace/$PROJECT"
 
-          # aby łatwo uploadować
           if [ ! -d "$PROJECT_DIR/.kiri" ]; then
             echo "⚠️ No .kiri directory found, creating empty directory."
             mkdir -p "$PROJECT_DIR/.kiri"
