@@ -38,7 +38,7 @@ jobs:
       - name: Print project being processed
         run: echo "Processing ${{ matrix.project }}"
 
-      - name: Run Kiri (raw docker)
+      - name: Run Kiri (raw docker, entrypoint override)
         run: |
           PROJECT="${{ matrix.project }}"
           PROJECT_DIR=$(dirname "$PROJECT")
@@ -46,14 +46,16 @@ jobs:
           echo "Running Kiri for: $PROJECT"
 
           docker run \
+            --entrypoint "" \
             -v "$PWD":/github/workspace \
             ghcr.io/usa-reddragon/kiri:v1.0.30 \
-            kiri --no-server --all "/github/workspace/$PROJECT"
+            /usr/local/bin/kiri --no-server --all "/github/workspace/$PROJECT"
 
           if [ ! -d "$PROJECT_DIR/.kiri" ]; then
             echo "⚠️ No .kiri directory found – creating empty one."
             mkdir -p "$PROJECT_DIR/.kiri"
           fi
+
 
       - name: Upload Kiri output
         uses: actions/upload-artifact@v4
