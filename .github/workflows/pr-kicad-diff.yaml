@@ -16,9 +16,13 @@ jobs:
         id: collect
         run: |
           FILES=$(find electronics -name "*.kicad_pro")
+
           echo "Found:"
           echo "$FILES"
-          echo "projects=$(printf '%s\n' $FILES | jq -R . | jq -s .)" >> $GITHUB_OUTPUT
+
+          JSON=$(printf '%s\n' $FILES | jq -R -s 'split("\n") | map(select(length > 0))' -c)
+
+          echo "projects=$JSON" >> "$GITHUB_OUTPUT"
 
   kiri-diff:
     needs: discover-projects
