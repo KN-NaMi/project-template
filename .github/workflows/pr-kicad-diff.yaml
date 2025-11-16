@@ -1,43 +1,67 @@
 name: KiCad PR Diff
 
-permissions:
-  contents: write
-  actions: write
-  packages: write
-  pull-requests: write
-
-  
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 on:
   pull_request:
-    types:
-    - opened
-    - synchronize
-
-env:
-    PROJECT_FILE: ./electronics/board1/pcb/test/test.kicad_pro
+    types: [opened, synchronize]
 
 jobs:
-  kiri-diff:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-    - name: Kiri
-      uses: hacker-fab/kiri-github-action@v1.2
-      with:
-        project-file: ./electronics/board1/pcb/test/test.kicad_pro
-        kiri-debug: true
 
-    - name: Run upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: kiri-output
-        path: ./electronics/board1/pcb/test/
-        if-no-files-found: warn
-      env:
-        PROJECT_FILE: ./projekt1/new.kicad_pro
+  discover-projects:
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.collect.outputs.projects }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find all KiCad .kicad_pro files
+        id: collect
+        run: |
+          FILES=$(find electronics -name "*.kicad_pro")
+          echo "Found:"
+          echo "$FILES"
+
+          # Convert to JSON array for matrix
+          JSON=$(printf '%s\n' $FILES | jq -R -s 'split("\n") | map(select(length > 0))' -c)
+          echo "projects=$JSON" >> "$GITHUB_OUTPUT"
+
+
+  kiri-diff:
+    needs: discover-projects
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        project: ${{ fromJson(needs.discover-projects.outputs.projects) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Print project path
+        run: echo "Processing: ${{ matrix.project }}"
+
+      - name: Run Kiri-Docker
+        run: |
+          PROJECT="${{ matrix.project }}"
+          PROJECT_DIR=$(dirname "$PROJECT")
+
+          echo "Running kiri-docker for $PROJECT"
+
+          docker run --rm \
+            -v "$PWD":/project \
+            leoheck/kiri:latest \
+            kiri-docker /project -k "-p /project/$PROJECT"
+
+          # kiri-docker always outputs to .kiri inside project directory
+          if [ ! -d "$PROJECT_DIR/.kiri" ]; then
+            echo "⚠️ No .kiri directory found. Creating empty one."
+            mkdir -p "$PROJECT_DIR/.kiri"
+          fi
+
+      - name: Upload Kiri output
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiri-output-${{ matrix.project }}
+          path: ${{ matrix.project }}/../.kiri
+          if-no-files-found: warn
