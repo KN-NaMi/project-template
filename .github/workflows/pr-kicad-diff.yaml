@@ -19,8 +19,11 @@ jobs:
           FILES=$(find electronics -name "*.kicad_pro")
           echo "Found:"
           echo "$FILES"
+
+          # Convert to JSON array
           JSON=$(printf '%s\n' $FILES | jq -R -s 'split("\n") | map(select(length > 0))' -c)
           echo "projects=$JSON" >> "$GITHUB_OUTPUT"
+
 
   kiri-diff:
     needs: discover-projects
@@ -38,17 +41,20 @@ jobs:
       - name: Print project path
         run: echo "Processing ${{ matrix.project }}"
 
-      - name: Run Kiri-Docker
+      - name: Run Kiri inside Docker
         run: |
           PROJECT="${{ matrix.project }}"
           PROJECT_DIR=$(dirname "$PROJECT")
-          echo "Running kiri-docker for $PROJECT"
+
+          echo "Running kiri inside container for: $PROJECT"
 
           docker run --rm \
             -v "$PWD":/project \
+            -w /project \
             leoheck/kiri:latest \
-            kiri-docker /project -k "-p /project/$PROJECT"
+            bash -lc "kiri -p /project/${PROJECT}"
 
+          # Ensure .kiri exists (Kiri may skip if no PCB diffs)
           if [ ! -d "$PROJECT_DIR/.kiri" ]; then
             echo "⚠️ No .kiri directory found. Creating empty one."
             mkdir -p "$PROJECT_DIR/.kiri"
