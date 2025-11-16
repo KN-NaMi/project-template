@@ -16,12 +16,11 @@ jobs:
         id: collect
         run: |
           FILES=$(find electronics -name "*.kicad_pro")
-
           echo "Found:"
           echo "$FILES"
 
+          # Tworzymy kompaktowy JSON do matrix
           JSON=$(printf '%s\n' $FILES | jq -R -s 'split("\n") | map(select(length > 0))' -c)
-
           echo "projects=$JSON" >> "$GITHUB_OUTPUT"
 
   kiri-diff:
@@ -39,19 +38,29 @@ jobs:
 
       - name: Print project being processed
         run: echo "Processing ${{ matrix.project }}"
+        
+      - name: Run Kiri (raw docker mode)
+        run: |
+          PROJECT="${{ matrix.project }}"
+          PROJECT_DIR=$(dirname "$PROJECT")
 
-      - name: Run Kiri
-        uses: hacker-fab/kiri-github-action@v1.2
-        with:
-          project-file: ${{ matrix.project }}
-          kiri-debug: true
-        env:
-          KIRI_OLDER: origin/main
-          KIRI_ALL: true
+          echo "Using project: $PROJECT"
+          echo "Project directory: $PROJECT_DIR"
+
+          docker run \
+            -v "$PWD":/data \
+            ghcr.io/usa-reddragon/kiri:v1.0.30 \
+            kiri --no-server --all "$PROJECT"
+
+          # aby łatwo uploadować
+          if [ ! -d "$PROJECT_DIR/.kiri" ]; then
+            echo "⚠️ No .kiri directory found, creating empty directory."
+            mkdir -p "$PROJECT_DIR/.kiri"
+          fi
 
       - name: Upload Kiri output
         uses: actions/upload-artifact@v4
         with:
           name: kiri-output-${{ matrix.project }}
-          path: ${{ matrix.project }}   # artifacts grouped per board
+          path: ${{ matrix.project }}/../.kiri
           if-no-files-found: warn
