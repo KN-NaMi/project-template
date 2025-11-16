@@ -38,18 +38,16 @@ jobs:
           PROJECT_DIR=$(dirname "$PROJECT")
 
           echo "Running Kiri for: $PROJECT"
-
+         
           docker run --rm \
             -v "$PWD":/project \
             leoheck/kiri:latest \
-            kiri /project -k "-p $PROJECT"
+            kiri -p /project/${PROJECT}
 
-          # Ensure output folder exists
-          mkdir -p "$PROJECT_DIR/.kiri"
 
-      - name: Upload Kiri output
-        uses: actions/upload-artifact@v4
-        with:
-          name: kiri-output-${{ matrix.project }}
-          path: ${{ matrix.project }}/../.kiri
-          if-no-files-found: warn
+      # - name: Upload Kiri output
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: kiri-output-${{ matrix.project }}
+      #     path: ${{ matrix.project }}/../.kiri
+      #     if-no-files-found: warn
